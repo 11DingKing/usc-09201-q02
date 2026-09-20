@@ -1,15 +1,20 @@
 import http from 'node:http';
+import { ManualClock, SystemClock } from './domain/clock.mjs';
+import { createRouter } from './http/router.mjs';
+import { EventStore } from './domain/store.mjs';
+import { NegotiationService } from './domain/service.mjs';
 
-export function createServer() {
-  return http.createServer((request, response) => {
-    if (request.method === 'GET' && request.url === '/health') {
-      response.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
-      response.end(JSON.stringify({ status: 'ok' }));
-      return;
-    }
-    response.writeHead(404, { 'content-type': 'application/json; charset=utf-8' });
-    response.end(JSON.stringify({ error: 'not_found' }));
-  });
+export function createServer({ clock, store } = {}) {
+  const eventStore = store ?? new EventStore();
+  const time = clock ?? new SystemClock();
+  const service = new NegotiationService(eventStore, time);
+  const router = createRouter(service);
+  const server = http.createServer(router);
+  // 测试与装配需要直接访问领域服务/存储/时钟
+  server.service = service;
+  server.store = eventStore;
+  server.clock = time;
+  return server;
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
